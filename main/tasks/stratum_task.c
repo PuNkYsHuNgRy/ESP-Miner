@@ -277,6 +277,7 @@ void stratum_close_connection(GlobalState * GLOBAL_STATE)
     GLOBAL_STATE->transport = NULL;
     pnky_ws_ctx_t *ws = GLOBAL_STATE->ws_ctx;
     GLOBAL_STATE->ws_ctx = NULL;
+    GLOBAL_STATE->ws_subscribed = false;
     taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
 
     if (transport != NULL) {
@@ -592,6 +593,7 @@ void stratum_task(void * pvParameters)
                 continue;
             }
             int authorize_message_id = uid;
+            GLOBAL_STATE->ws_subscribed = true;
 
             while (1) {
                 char *line = pnky_ws_recv_line(ws, 180);

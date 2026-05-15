@@ -153,6 +153,7 @@ typedef struct
     // For requests not expecting a response (called notifications), this is null.
     int send_uid;
 
+    bool ws_subscribed;
     bool ASIC_initalized;
     bool psram_is_available;
     bool filesystem_is_available;

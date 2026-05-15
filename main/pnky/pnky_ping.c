@@ -70,7 +70,7 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
 
     bool btc_connected = false;
     taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
-    if (GLOBAL_STATE->ws_ctx && pnky_ws_is_connected(GLOBAL_STATE->ws_ctx))
+    if (GLOBAL_STATE->ws_ctx && pnky_ws_is_connected(GLOBAL_STATE->ws_ctx) && GLOBAL_STATE->ws_subscribed)
         btc_connected = true;
     else if (GLOBAL_STATE->transport)
         btc_connected = true;
@@ -229,11 +229,21 @@ cleanup:
     return false;
 }
 
+void pnky_ping_init(GlobalState *GLOBAL_STATE)
+{
+    const char *device_id = pnky_config_get_device_id();
+    char *api_key = pnky_config_get_string(PNKY_KEY_API_KEY);
+    ESP_LOGI(TAG, "PNKY ping initialized (device: %s, has_key: %s)",
+             device_id, api_key && strlen(api_key) > 0 ? "yes" : "no");
+    free(api_key);
+}
+
 void pnky_ping_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    vTaskDelay(30000 / portTICK_PERIOD_MS);
+    pnky_ping_init(GLOBAL_STATE);
+    vTaskDelay(10000 / portTICK_PERIOD_MS);
 
     while (1) {
         pnky_send_ping_internal(0, GLOBAL_STATE);
