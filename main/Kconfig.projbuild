@@ -69,20 +69,20 @@ menu "Stratum Configuration"
 
     config STRATUM_URL
         string "Stratum Address"
-        default "public-pool.io"
+        default "btcpool.punkyshungry.com"
         help
             The example will connect to this Stratum pool address.
 
     config STRATUM_PORT
         int "Stratum Port"
         range 0 65535
-        default 21496
+        default 443
         help
             The stratum server port to connect to.
     
     choice
         prompt "Stratum TLS mode"
-        default STRATUM_TLS_DISABLED
+        default STRATUM_TLS_BUNDLED
         help
             Select how TLS is used for stratum connections.
 
