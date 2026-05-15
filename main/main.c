@@ -142,6 +142,7 @@ void app_main(void)
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 
+    pnky_ping_init(&GLOBAL_STATE);
     if (xTaskCreate(pnky_ping_task, "pnky_ping", 8192, (void *)&GLOBAL_STATE, 3, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Error creating pnky ping task");
     }

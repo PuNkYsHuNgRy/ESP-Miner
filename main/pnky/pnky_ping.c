@@ -8,12 +8,16 @@
 #include <string.h>
 #include <stdlib.h>
 #include "mbedtls/md.h"
+#include "driver/temperature_sensor.h"
 
 static const char *TAG = "pnky_ping";
 
 static int pnky_409_count = 0;
 bool pnky_first_ping_done = false;
 bool pnky_license_valid = false;
+
+static temperature_sensor_handle_t s_temp_sensor = NULL;
+static bool s_temp_sensor_enabled = false;
 
 static void compute_challenge_response(const char *nonce, const char *key, char *out, size_t out_size)
 {
@@ -79,6 +83,16 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
     cJSON_AddNumberToObject(root, "btc_hashrate", (double)mod->current_hashrate);
     cJSON_AddNumberToObject(root, "btc_diff", GLOBAL_STATE->pool_difficulty);
     cJSON_AddNumberToObject(root, "btc_shares", (double)mod->shares_accepted);
+
+    uint64_t total_hashes = (uint64_t)(mod->current_hashrate * 1000000.0) * uptime_sec;
+    cJSON_AddNumberToObject(root, "btc_hashes", (double)total_hashes);
+
+    if (s_temp_sensor_enabled) {
+        float temp;
+        if (temperature_sensor_get_celsius(s_temp_sensor, &temp) == ESP_OK) {
+            cJSON_AddNumberToObject(root, "temperature", temp);
+        }
+    }
 
     if (api_key && strlen(api_key) > 0) {
         cJSON_AddStringToObject(root, "api_key", api_key);
@@ -229,6 +243,11 @@ cleanup:
     return false;
 }
 
+bool pnky_send_ping(GlobalState *GLOBAL_STATE)
+{
+    return pnky_send_ping_internal(0, GLOBAL_STATE);
+}
+
 void pnky_ping_init(GlobalState *GLOBAL_STATE)
 {
     const char *device_id = pnky_config_get_device_id();
@@ -236,17 +255,29 @@ void pnky_ping_init(GlobalState *GLOBAL_STATE)
     ESP_LOGI(TAG, "PNKY ping initialized (device: %s, has_key: %s)",
              device_id, api_key && strlen(api_key) > 0 ? "yes" : "no");
     free(api_key);
+
+    temperature_sensor_config_t temp_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
+    esp_err_t err = temperature_sensor_install(&temp_config, &s_temp_sensor);
+    if (err == ESP_OK) {
+        err = temperature_sensor_enable(s_temp_sensor);
+        if (err == ESP_OK) {
+            s_temp_sensor_enabled = true;
+            ESP_LOGI(TAG, "Temperature sensor enabled");
+        }
+    }
+    if (!s_temp_sensor_enabled) {
+        ESP_LOGW(TAG, "Temperature sensor not available (err: %s)", esp_err_to_name(err));
+    }
 }
 
 void pnky_ping_task(void *pvParameters)
 {
     GlobalState *GLOBAL_STATE = (GlobalState *)pvParameters;
 
-    pnky_ping_init(GLOBAL_STATE);
     vTaskDelay(10000 / portTICK_PERIOD_MS);
 
     while (1) {
-        pnky_send_ping_internal(0, GLOBAL_STATE);
+        pnky_send_ping(GLOBAL_STATE);
 
         int interval = pnky_config_get_int(PNKY_KEY_PING_INTERVAL);
         if (interval < 10) interval = 60;

@@ -12,7 +12,7 @@ static const char *TAG = "pnky_config";
 static nvs_handle_t pnky_handle;
 
 static const char *pnky_key_names[PNKY_KEY_COUNT] = {
-    "solana_wallet",
+    "wallet",
     "api_key",
     "challenge_nonce",
     "device_id",
