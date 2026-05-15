@@ -1,97 +1,75 @@
-# ESP-Miner Development Guide for Agents
+# ESP-Miner PNKY Integration Notes
 
-Welcome to the ESP-Miner repository. This document provides a high-level overview of the project structure, build instructions, and CI setup to help you navigate and contribute effectively.
+## Overview
 
-## Project Overview
-ESP-Miner is the firmware powering the Bitaxe open-source Bitcoin ASIC miners. It is built on the ESP-IDF framework (v5.x+) for the ESP32-S3 and includes a modern web interface (Axe-OS) built with Angular.
+This is a fork of [bitaxeorg/ESP-Miner](https://github.com/bitaxeorg/ESP-Miner) with PNKY (NoRugPull) modules added for the Bitaxe BM1370 ASIC miner.
 
-## Repository Structure
+## PNKY Changes
 
-```text
-.
-├── .github/workflows/          # CI/CD pipelines (GitHub Actions)
-├── bootloader_components/      # Custom components for the 2nd stage bootloader
-├── components/                 # Shared application components (asic, stratum, etc.)
-├── main/                       # Main application source code
-│   └── http_server/            # C-based HTTP server logic
-│       └── axe-os/             # Axe-OS Angular Frontend
-├── config-*.cvs                # Hardware-specific configuration files
-├── partitions.csv              # Flash partition layout
-└── sdkconfig                   # Project-wide ESP-IDF configuration
+### New Files (main/pnky/)
+
+- `pnky_ws_client.h/c` — WebSocket client on top of ESP-IDF esp_transport
+  - Connects via WSS to btcpool.punkyshungry.com:443
+  - Handles WebSocket upgrade, frame masking, text frame send/recv
+  - Buffer management for fragmented frames
+
+- `pnky_config.h/c` — PNKY-specific NVS config
+  - Separate NVS namespace "pnky" for Solana wallet, API key, challenge nonce, device ID
+  - Auto-generates random 16-char hex device ID on first boot
+
+- `pnky_ping.h/c` — Periodic HTTP ping task
+  - POSTs to norugcoin.punkyshungry.com/api/v1/ping every 60s
+  - Sends hashrate, shares, diff, firmware version
+  - Handles 200/401 response (saves api_key + challenge_nonce)
+  - Handles 409 re-registration (regenerates device ID on flag)
+
+### Modified Files
+
+- `main/global_state.h` — Added `pnky_ws_ctx_t *ws_ctx` field
+- `main/main.c` — PNKY config init + ping task creation
+- `main/CMakeLists.txt` — Added pnky sources, includes, esp_http_client, mbedtls deps
+- `main/tasks/stratum_task.c` — Replaced raw TCP/TLS transport with WSS via WebSocket client
+- `main/tasks/asic_result_task.c` — Share submission via WS (or fallback to raw transport)
+
+## Architecture
+
+```
+Bitaxe → WSS btcpool.punkyshungry.com:443 → Cloudflare → ws_proxy → ckpool:3333
+       → HTTP norugcoin.punkyshungry.com (ping) → Cloudflare → server:8000
 ```
 
-## Build Instructions
+## Stratum Flow (WSS)
 
-### 1. Firmware (Main Project)
-The project uses the standard ESP-IDF build system. Ensure you are using ESP-IDF v5.5.1 (or compatible).
+1. `pnky_ws_connect(host, 443, "/", true)` — TCP+TLS + WS upgrade
+2. Send `mining.configure` (JSON-RPC as WS text frame + \n)
+3. Send `mining.subscribe` 
+4. Send `mining.authorize` (username = btcwallet.deviceid)
+5. Loop: `pnky_ws_recv_line()` → parse → handle notify/diff/share results
+6. Share submission: build JSON in `asic_result_task.c`, send via `pnky_ws_send()`
 
-**Prerequisites:**
-- ESP-IDF v5.5.1 environment sourced.
-- Node.js (v22+) and npm for the frontend bundle.
+## Fallback Mode
 
-**Commands:**
+If using raw TCP (non-443 port), falls back to original `esp_transport` + `STRATUM_V1_*` functions.
+Heartbeat task only created in fallback mode.
+
+## Build
+
 ```bash
-# Source the environment
+cd /root/norugpull/bitaxe-firmware
 . ~/esp/v5.5.1/esp-idf/export.sh
-
-# Build the project (automatically builds Axe-OS and generates binaries)
 idf.py build
-
-# Flash to device
-idf.py build flash
-```
-*Note: The Axe-OS frontend is automatically built and compressed into `www.bin` as part of the main `idf.py build` process.*
-
-### 2. Axe-OS (Frontend)
-The frontend is a standalone Angular application located in `main/http_server/axe-os`.
-
-**Commands:**
-```bash
-cd main/http_server/axe-os
-npm install
-
-# Build only the frontend
-npm run build
-
-# Run local development server
-npm run start
 ```
 
-## Testing
+## Config
 
-### Internal C Components
-Firmware unit tests are located in the `test/` directory.
-```bash
-idf.py build test
-```
+Pool URL defaults to WSS port 443 automatically. Configure via Axe-OS web UI or NVS:
 
-### Axe-OS Frontend
-Angular unit tests use Karma and Jasmine. We use a specific CI command for CI environments which ensures consistent reporting and uses a headless browser.
+- `NVS_CONFIG_STRATUM_URL` = `btcpool.punkyshungry.com`
+- `NVS_CONFIG_STRATUM_PORT` = `443`
+- `NVS_CONFIG_STRATUM_TLS` = `2` (BUNDLED_CRT)
 
-**Execution:**
-```bash
-cd main/http_server/axe-os
-npm run test:ci
-```
-
-**Key Points:**
-- `npm run test:ci` automatically runs `npm run generate:api` before executing `ng test`.
-- It uses a custom `ChromeHeadlessCI` launcher (defined in `karma.conf.js`) with `--no-sandbox` to ensure stability in containerized CI environments.
-- Unit tests are highly isolated. **Reminder:** Components with many dependencies (like `HomeComponent`) must have all services, pipes, and sub-components explicitly declared or provided in the `TestBed`.
-
-## CI/CD Setup
-
-We use GitHub Actions for automated testing and releases.
-
-### Key Workflows:
-- **`unittest.yml`**: Runs both backend and frontend unit tests in parallel.
-- **`build.yml`**: Verifies that the project compiles for all primary configurations.
-- **`release.yml`**: Handles automated releases and binary packaging.
-
-## AI Agent Tips
-- **API Generation**: If you modify `openapi.yaml`, you **must** run `npm run generate:api` in the `axe-os` directory to update the TypeScript services. This is also automatically handled by `npm run build` and `npm run test:ci`.
-- **Node Environment**: If `node` or `npm` are not in your global path, check for local installations in `~/.nvm`. You can source them using `export PATH=~/.nvm/versions/node/v[version]/bin:$PATH`.
-- **Modern Angular Testing**: Use functional providers like `provideRouter([])` and `provideHttpClient()` instead of deprecated class-based modules like `RouterTestingModule`.
-- **PSRAM**: Bitaxe heavily relies on PSRAM. Always check `esp_psram_is_initialized()` before allocating large buffers in the backend.
-- **Mock Data Parity**: When updating `openapi.yaml` and regenerating the API, you **must** update the mock data in `main/http_server/axe-os/src/app/services/system.service.ts`. The TypeScript compiler will fail if properties are missing from the `of()` calls used for development.
-- **API Type Safety**: The `SystemInfo` API uses a numeric 0/1 pattern for many boolean-like status fields (e.g., `overclockEnabled`, `overheat_mode`). In the backend, use `cJSON_AddNumberToObject(root, "key", val ? 1 : 0)` to maintain parity with the `integer` types in OpenAPI and support strict equality checks (`=== 1`) in the Angular frontend.
+PNKY settings stored in NVS namespace "pnky":
+- `solana_wallet` — user's Solana public key for PNKY rewards
+- `api_key`, `challenge_nonce` — auth handshake (set by server)
+- `device_id` — random 16-char hex, used as stratum worker name suffix
+- `server_url` — default http://norugcoin.punkyshungry.com

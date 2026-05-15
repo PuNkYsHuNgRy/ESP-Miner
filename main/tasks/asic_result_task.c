@@ -12,6 +12,8 @@
 #include "asic.h"
 #include "freertos/task.h"
 #include "scoreboard.h"
+#include "pnky/pnky_ws_client.h"
+#include "pnky/pnky_config.h"
 
 static const char *TAG = "asic_result";
 
@@ -60,16 +62,44 @@ void ASIC_result_task(void *pvParameters)
         uint32_t version_bits = asic_result->rolled_version ^ active_job->version;
         if (nonce_diff >= active_job->pool_diff)
         {
-            char * user = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-
             taskENTER_CRITICAL(&GLOBAL_STATE->stratum_mux);
             esp_transport_handle_t transport = GLOBAL_STATE->transport;
+            pnky_ws_ctx_t *ws = GLOBAL_STATE->ws_ctx;
             int uid = GLOBAL_STATE->send_uid++;
             taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
 
-            if (transport == NULL) {
-                ESP_LOGW(TAG, "No stratum connection, dropping share (job 0x%02X)", job_id);
-            } else {
+            if (ws && pnky_ws_is_connected(ws)) {
+                const char *device_id = pnky_config_get_device_id();
+                const char *base_user = GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+                if (!base_user) base_user = "";
+                const char *dot = strchr(base_user, '.');
+                char ws_user[128];
+                if (dot) {
+                    snprintf(ws_user, sizeof(ws_user), "%.*s.%s", (int)(dot - base_user), base_user, device_id);
+                } else {
+                    snprintf(ws_user, sizeof(ws_user), "%s.%s", base_user, device_id);
+                }
+                char submit_msg[512];
+                int n = snprintf(submit_msg, sizeof(submit_msg),
+                    "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
+                    uid, ws_user,
+                    active_job->jobid ? active_job->jobid : "",
+                    active_job->extranonce2 ? active_job->extranonce2 : "",
+                    (unsigned long)active_job->ntime,
+                    (unsigned long)asic_result->nonce,
+                    (unsigned long)version_bits);
+
+                uint64_t sent_time_us = esp_timer_get_time();
+                bool ok = pnky_ws_send(ws, submit_msg, n);
+                if (!ok) {
+                    ESP_LOGW(TAG, "Unable to write share to WS socket");
+                }
+
+                float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
+                GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
+                ESP_LOGI(TAG, "Processing time: %0.1f ms", process_time);
+
+            } else if (transport) {
                 uint64_t sent_time_us = 0;
                 int ret = STRATUM_V1_submit_share(
                     transport,
@@ -84,12 +114,13 @@ void ASIC_result_task(void *pvParameters)
 
                 if (ret < 0) {
                     ESP_LOGW(TAG, "Unable to write share to socket (ret: %d, errno %d: %s)", ret, errno, strerror(errno));
-                    // stratum_task recv loop will detect a broken connection on its next read and handle reconnection
                 }
 
                 float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
                 GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
                 ESP_LOGI(TAG, "Processing time: %0.1f ms", process_time);
+            } else {
+                ESP_LOGW(TAG, "No stratum connection, dropping share (job 0x%02X)", job_id);
             }
         }
 

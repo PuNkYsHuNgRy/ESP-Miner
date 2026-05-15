@@ -15,6 +15,7 @@
 #include "display.h"
 #include "scoreboard.h"
 #include "esp_transport.h"
+#include "pnky/pnky_ws_client.h"
 
 #define STRATUM_USER CONFIG_STRATUM_USER
 #define FALLBACK_STRATUM_USER CONFIG_FALLBACK_STRATUM_USER
@@ -145,6 +146,7 @@ typedef struct
     bool new_stratum_version_rolling_msg;
 
     esp_transport_handle_t transport;
+    pnky_ws_ctx_t *ws_ctx;
     portMUX_TYPE stratum_mux;
     
     // A message ID that must be unique per request that expects a response.

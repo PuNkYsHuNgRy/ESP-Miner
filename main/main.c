@@ -25,6 +25,9 @@
 #include "filesystem.h"
 #include "input.h"
 #include "log_buffer.h"
+#include "pnky/pnky_config.h"
+#include "pnky/pnky_ping.h"
+#include "pnky/pnky_ota.h"
 
 static GlobalState GLOBAL_STATE;
 
@@ -71,6 +74,9 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to init NVS");
         return;
     }
+
+    pnky_config_init();
+    pnky_ota_init();
 
     // Ensure SSID is initialized before any screen/self-test uses it.
     GLOBAL_STATE.SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
@@ -134,6 +140,13 @@ void app_main(void)
 
     while (!GLOBAL_STATE.SYSTEM_MODULE.is_connected) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
+    if (xTaskCreate(pnky_ping_task, "pnky_ping", 8192, (void *)&GLOBAL_STATE, 3, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating pnky ping task");
+    }
+    if (xTaskCreate(pnky_ota_task, "pnky_ota", 10240, (void *)&GLOBAL_STATE, 1, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Error creating pnky ota task");
     }
 
     queue_init(&GLOBAL_STATE.stratum_queue);
