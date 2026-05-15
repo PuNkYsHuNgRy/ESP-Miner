@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "esp_mac.h"
 
 static const char *TAG = "pnky_config";
 
@@ -44,12 +45,6 @@ void pnky_config_init(void)
         }
     }
     nvs_commit(pnky_handle);
-
-    char *device_id = pnky_config_get_string(PNKY_KEY_DEVICE_ID);
-    if (!device_id || strlen(device_id) < 8) {
-        pnky_config_generate_device_id();
-    }
-    free(device_id);
 
     ESP_LOGI(TAG, "PNKY config initialized");
 }
@@ -101,33 +96,20 @@ void pnky_config_set_int(pnky_config_key_t key, int value)
     pnky_config_set_string(key, buf);
 }
 
-void pnky_config_generate_device_id(void)
-{
-    char id[PNKY_DEVICE_ID_LEN + 1] = {0};
-    const char *hex = "0123456789abcdef";
-    for (int i = 0; i < PNKY_DEVICE_ID_LEN; i++) {
-        id[i] = hex[rand() & 0x0F];
-    }
-    id[PNKY_DEVICE_ID_LEN] = '\0';
-
-    nvs_set_str(pnky_handle, pnky_key_names[PNKY_KEY_DEVICE_ID], id);
-    nvs_commit(pnky_handle);
-    ESP_LOGI(TAG, "Generated device ID: %s", id);
-}
+static char s_device_id[PNKY_DEVICE_ID_LEN + 1] = {0};
 
 const char *pnky_config_get_device_id(void)
 {
-    static char cached_id[PNKY_DEVICE_ID_LEN + 1] = {0};
-
-    if (cached_id[0] != '\0') return cached_id;
-
-    size_t len = sizeof(cached_id);
-    esp_err_t err = nvs_get_str(pnky_handle, pnky_key_names[PNKY_KEY_DEVICE_ID], cached_id, &len);
-    if (err != ESP_OK || strlen(cached_id) < 8) {
-        pnky_config_generate_device_id();
-        len = sizeof(cached_id);
-        nvs_get_str(pnky_handle, pnky_key_names[PNKY_KEY_DEVICE_ID], cached_id, &len);
+    if (s_device_id[0] == '\0') {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        snprintf(s_device_id, sizeof(s_device_id),
+                 "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     }
+    return s_device_id;
+}
 
-    return cached_id;
+void pnky_config_generate_device_id(void)
+{
+    s_device_id[0] = '\0';
 }

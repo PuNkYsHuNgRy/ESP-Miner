@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define PNKY_NVS_NAMESPACE "pnky"
-#define PNKY_DEVICE_ID_LEN 16
+#define PNKY_DEVICE_ID_LEN 24
 
 typedef enum {
     PNKY_KEY_SOLANA_WALLET,
