@@ -14,6 +14,7 @@
 #define HASHRATE_UNIT 0x100000uLL // Hashrate register unit (2^24 hashes)
 
 #define POLL_RATE 5000
+#define HASH_CNT_LSB 0x100000000uLL
 #define HASHRATE_1M_SIZE (60000 / POLL_RATE)  // 12
 #define HASHRATE_10M_SIZE 10
 #define HASHRATE_1H_SIZE 6
@@ -26,6 +27,7 @@ static float hashrate_10m_prev;
 static float hashrate_10m[HASHRATE_10M_SIZE];
 static float hashrate_1h_prev;
 static float hashrate_1h[HASHRATE_1H_SIZE];
+static uint32_t prev_total_value[4];
 
 static const char *TAG = "hashrate_monitor";
 
@@ -56,6 +58,7 @@ void hashrate_monitor_reset_measurements(void *pvParameters)
     memset(HASHRATE_MONITOR_MODULE->total_measurement, 0, asic_count * sizeof(measurement_t));
     memset(HASHRATE_MONITOR_MODULE->domain_measurements[0], 0, asic_count * hash_domains * sizeof(measurement_t));
     memset(HASHRATE_MONITOR_MODULE->error_measurement, 0, asic_count * sizeof(measurement_t));
+    memset(prev_total_value, 0, sizeof(prev_total_value));
     pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 }
 
@@ -186,6 +189,13 @@ void hashrate_monitor_task(void *pvParameters)
             pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);
             float current_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->total_measurement, asic_count);
             float error_hashrate = sum_hashrates(HASHRATE_MONITOR_MODULE->error_measurement, asic_count);
+            for (int i = 0; i < asic_count; i++) {
+                uint32_t cur = HASHRATE_MONITOR_MODULE->total_measurement[i].value;
+                if (cur >= prev_total_value[i]) {
+                    GLOBAL_STATE->SYSTEM_MODULE.total_hashes += (uint64_t)(cur - prev_total_value[i]) * HASH_CNT_LSB;
+                }
+                prev_total_value[i] = cur;
+            }
             pthread_mutex_unlock(&HASHRATE_MONITOR_MODULE->lock);
 
             SYSTEM_MODULE->current_hashrate = current_hashrate;

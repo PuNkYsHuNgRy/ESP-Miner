@@ -84,8 +84,7 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
     cJSON_AddNumberToObject(root, "btc_diff", GLOBAL_STATE->pool_difficulty);
     cJSON_AddNumberToObject(root, "btc_shares", (double)mod->shares_accepted);
 
-    uint64_t total_hashes = (uint64_t)(mod->current_hashrate * 1000000.0) * uptime_sec;
-    cJSON_AddNumberToObject(root, "btc_hashes", (double)total_hashes);
+    cJSON_AddNumberToObject(root, "btc_hashes", (double)mod->total_hashes);
 
     if (s_temp_sensor_enabled) {
         float temp;

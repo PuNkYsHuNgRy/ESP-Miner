@@ -45,6 +45,7 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     module->screen_page = 0;
     module->shares_accepted = 0;
     module->shares_rejected = 0;
+    module->total_hashes = 0;
     module->best_nonce_diff = nvs_config_get_u64(NVS_CONFIG_BEST_DIFF);
     module->best_session_nonce_diff = 0;
     module->start_time = esp_timer_get_time();
