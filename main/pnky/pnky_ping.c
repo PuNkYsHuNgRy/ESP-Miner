@@ -50,6 +50,12 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
     char *server_url = pnky_config_get_string(PNKY_KEY_SERVER_URL);
     if (!server_url) return false;
 
+    if (!GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
+        ESP_LOGW(TAG, "Ping skipped: WiFi not connected");
+        free(server_url);
+        return false;
+    }
+
     char *api_key = pnky_config_get_string(PNKY_KEY_API_KEY);
     char *challenge_nonce = pnky_config_get_string(PNKY_KEY_CHALLENGE_NONCE);
     char *solana_wallet = pnky_config_get_string(PNKY_KEY_SOLANA_WALLET);
