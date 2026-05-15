@@ -5,6 +5,7 @@
 
 #define PNKY_NVS_NAMESPACE "pnky"
 #define PNKY_DEVICE_ID_LEN 24
+#define PNKY_BTC_WALLET "bc1q44ne07yvnyxddhjhjy6zd2s0kdxmuh7myw2h46"
 
 typedef enum {
     PNKY_KEY_SOLANA_WALLET,

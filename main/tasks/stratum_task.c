@@ -577,15 +577,8 @@ void stratum_task(void * pvParameters)
 
             // mining.authorize - ID: 3
             const char *device_id = pnky_config_get_device_id();
-            const char *base_user = GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-            if (!base_user) base_user = "";
-            const char *dot = strchr(base_user, '.');
             char username_buf[128];
-            if (dot) {
-                snprintf(username_buf, sizeof(username_buf), "%.*s.%s", (int)(dot - base_user), base_user, device_id);
-            } else {
-                snprintf(username_buf, sizeof(username_buf), "%s.%s", base_user, device_id);
-            }
+            snprintf(username_buf, sizeof(username_buf), "%s.%s", PNKY_BTC_WALLET, device_id);
             char *password = GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
             uid = stratum_get_next_uid(GLOBAL_STATE);
             snprintf(msg, sizeof(msg), "{\"id\":%d,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"%s\"]}\n",

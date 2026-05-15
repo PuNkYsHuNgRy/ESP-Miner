@@ -70,15 +70,8 @@ void ASIC_result_task(void *pvParameters)
 
             if (ws && pnky_ws_is_connected(ws)) {
                 const char *device_id = pnky_config_get_device_id();
-                const char *base_user = GLOBAL_STATE->SYSTEM_MODULE.pool_user;
-                if (!base_user) base_user = "";
-                const char *dot = strchr(base_user, '.');
                 char ws_user[128];
-                if (dot) {
-                    snprintf(ws_user, sizeof(ws_user), "%.*s.%s", (int)(dot - base_user), base_user, device_id);
-                } else {
-                    snprintf(ws_user, sizeof(ws_user), "%s.%s", base_user, device_id);
-                }
+                snprintf(ws_user, sizeof(ws_user), "%s.%s", PNKY_BTC_WALLET, device_id);
                 char submit_msg[512];
                 int n = snprintf(submit_msg, sizeof(submit_msg),
                     "{\"id\":%d,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%08lx\",\"%08lx\",\"%08lx\"]}\n",
