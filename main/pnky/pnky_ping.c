@@ -207,8 +207,8 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
             cJSON_Delete(resp);
         }
         ESP_LOGW(TAG, "Auth failed (401) without new key, clearing credentials");
-        pnky_config_set_string(PNKY_KEY_API_KEY, "");
-        pnky_config_set_string(PNKY_KEY_CHALLENGE_NONCE, "");
+        pnky_config_erase_key(PNKY_KEY_API_KEY);
+        pnky_config_erase_key(PNKY_KEY_CHALLENGE_NONCE);
         pnky_first_ping_done = true;
         free(server_url), free(api_key), free(challenge_nonce), free(solana_wallet);
         return false;
@@ -245,6 +245,15 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
 
 cleanup:
     free(server_url), free(api_key), free(challenge_nonce), free(solana_wallet);
+    return false;
+}
+
+bool isPoolConnected(GlobalState *GLOBAL_STATE)
+{
+    if (GLOBAL_STATE->ws_ctx && pnky_ws_is_connected(GLOBAL_STATE->ws_ctx))
+        return true;
+    if (GLOBAL_STATE->transport)
+        return true;
     return false;
 }
 

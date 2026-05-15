@@ -80,6 +80,13 @@ void pnky_config_set_string(pnky_config_key_t key, const char *value)
     nvs_commit(pnky_handle);
 }
 
+void pnky_config_erase_key(pnky_config_key_t key)
+{
+    if (key < 0 || key >= PNKY_KEY_COUNT) return;
+    nvs_erase_key(pnky_handle, pnky_key_names[key]);
+    nvs_commit(pnky_handle);
+}
+
 int pnky_config_get_int(pnky_config_key_t key)
 {
     char *val = pnky_config_get_string(key);

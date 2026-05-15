@@ -20,6 +20,7 @@ typedef enum {
 void pnky_config_init(void);
 char *pnky_config_get_string(pnky_config_key_t key);
 void pnky_config_set_string(pnky_config_key_t key, const char *value);
+void pnky_config_erase_key(pnky_config_key_t key);
 int pnky_config_get_int(pnky_config_key_t key);
 void pnky_config_set_int(pnky_config_key_t key, int value);
 void pnky_config_generate_device_id(void);
