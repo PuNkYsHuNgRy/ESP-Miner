@@ -295,19 +295,20 @@ esp_netif_t * wifi_init_softap(GlobalState * GLOBAL_STATE)
 
     uint8_t mac[6];
     esp_wifi_get_mac(ESP_IF_WIFI_AP, mac);
-    // Format the last 4 bytes of the MAC address as a hexadecimal string
-    snprintf(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid), "Bitaxe_%02X%02X", mac[4], mac[5]);
+    snprintf(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid, sizeof(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid), "NoRugPull_%02X%02X", mac[4], mac[5]);
 
     wifi_config_t wifi_ap_config = { 0 };
     wifi_ap_config.ap.ssid_len = strlen(GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
     memcpy(wifi_ap_config.ap.ssid, GLOBAL_STATE->SYSTEM_MODULE.ap_ssid, wifi_ap_config.ap.ssid_len);
     wifi_ap_config.ap.channel = 1;
     wifi_ap_config.ap.max_connection = 10;
-    wifi_ap_config.ap.authmode = WIFI_AUTH_OPEN;
+    wifi_ap_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
+    memcpy(wifi_ap_config.ap.password, "norugpull", 9);
     wifi_ap_config.ap.pmf_cfg.required = false;
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_ap_config));
 
+    ESP_LOGI(TAG, "SoftAP started: %s (password: norugpull)", GLOBAL_STATE->SYSTEM_MODULE.ap_ssid);
     return esp_netif_ap;
 }
 
