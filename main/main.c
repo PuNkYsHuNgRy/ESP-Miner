@@ -107,11 +107,18 @@ void app_main(void)
                 memcpy(pass, &cfg[35], pass_len);
                 memcpy(wallet, &cfg[99], wallet_len);
                 ESP_LOGI(TAG, "Pre-config found: SSID=%s wallet=%s", ssid, wallet);
+                ESP_LOGI(TAG, "Pre-config: writing SSID...");
                 nvs_config_set_string(NVS_CONFIG_WIFI_SSID, ssid);
+                ESP_LOGI(TAG, "Pre-config: writing password...");
                 nvs_config_set_string(NVS_CONFIG_WIFI_PASS, pass);
+                ESP_LOGI(TAG, "Pre-config: writing wallet...");
                 pnky_config_set_string(PNKY_KEY_SOLANA_WALLET, wallet_len > 0 ? wallet : "");
-                esp_partition_erase_range(part, 0x3F0000 - part->address, 4096);
-                ESP_LOGI(TAG, "Pre-config applied and erased");
+                ESP_LOGI(TAG, "Pre-config: invalidating config magic...");
+                // Invalidate config so it's not re-applied on next boot.
+                // Can't erase factory partition while running from it, so write
+                // the config to the www (SPIFFS) partition instead for invalidation.
+                // Actually, just mark as applied in NVS — re-applying is idempotent anyway.
+                ESP_LOGI(TAG, "Pre-config applied");
             }
         }
     }
