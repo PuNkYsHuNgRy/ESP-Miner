@@ -14,6 +14,7 @@
 #include "scoreboard.h"
 #include "pnky/pnky_ws_client.h"
 #include "pnky/pnky_config.h"
+#include "stratum_api.h"
 
 static const char *TAG = "asic_result";
 
@@ -84,6 +85,7 @@ void ASIC_result_task(void *pvParameters)
                     (unsigned long)version_bits);
 
                 uint64_t sent_time_us = esp_timer_get_time();
+                STRATUM_V1_stamp_tx(uid, sent_time_us);
                 bool ok = pnky_ws_send(ws, submit_msg, n);
                 if (!ok) {
                     ESP_LOGW(TAG, "Unable to write share to WS socket");

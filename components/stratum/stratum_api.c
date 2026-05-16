@@ -36,6 +36,11 @@ static RequestTiming* get_request_timing(int request_id) {
     return &request_timings[index];
 }
 
+void STRATUM_V1_stamp_tx(int request_id, uint64_t timestamp_us)
+{
+    stamp_tx(request_id, timestamp_us);
+}
+
 float STRATUM_V1_get_response_time_ms(int request_id, int64_t receive_time_us)
 {
     if (request_id < 0) return -1.0;
