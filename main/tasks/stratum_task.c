@@ -20,6 +20,7 @@
 #include "esp_app_desc.h"
 #include "pnky/pnky_ws_client.h"
 #include "pnky/pnky_config.h"
+#include "nvs_config.h"
 
 #define MAX_RETRY_ATTEMPTS 3
 #define MAX_CRITICAL_RETRY_ATTEMPTS 5
