@@ -3,6 +3,7 @@
 #include "pnky_ws_client.h"
 #include "esp_log.h"
 #include "esp_http_client.h"
+#include "esp_crt_bundle.h"
 #include "esp_timer.h"
 #include "cJSON.h"
 #include <string.h>
@@ -50,6 +51,15 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
     char *server_url = pnky_config_get_string(PNKY_KEY_SERVER_URL);
     if (!server_url) return false;
 
+    if (strncmp(server_url, "https://", 8) == 0) {
+        char *http_url = malloc(strlen(server_url));
+        if (http_url) {
+            snprintf(http_url, strlen(server_url), "http://%s", server_url + 8);
+            free(server_url);
+            server_url = http_url;
+        }
+    }
+
     if (!GLOBAL_STATE->SYSTEM_MODULE.is_connected) {
         ESP_LOGW(TAG, "Ping skipped: WiFi not connected");
         free(server_url);
@@ -86,7 +96,7 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
         btc_connected = true;
     taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
     cJSON_AddBoolToObject(root, "btc_connected", btc_connected);
-    cJSON_AddNumberToObject(root, "btc_hashrate", (double)mod->current_hashrate);
+    cJSON_AddNumberToObject(root, "btc_hashrate", (double)mod->current_hashrate * 1e9);
     cJSON_AddNumberToObject(root, "btc_diff", GLOBAL_STATE->pool_difficulty);
     cJSON_AddNumberToObject(root, "btc_shares", (double)mod->shares_accepted);
 
@@ -123,6 +133,7 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
         .url = url,
         .method = HTTP_METHOD_POST,
         .timeout_ms = 10000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -135,22 +146,44 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
     esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_http_client_set_post_field(client, json, strlen(json));
 
-    esp_err_t err = esp_http_client_perform(client);
+    esp_err_t err = esp_http_client_open(client, strlen(json));
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "HTTP POST failed: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "HTTP open failed: %s", esp_err_to_name(err));
         esp_http_client_cleanup(client);
         free(json);
         goto cleanup;
     }
 
+    int written = esp_http_client_write(client, json, strlen(json));
+    if (written < 0) {
+        ESP_LOGW(TAG, "HTTP write failed");
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+        free(json);
+        goto cleanup;
+    }
+
+    int content_length = esp_http_client_fetch_headers(client);
     int status = esp_http_client_get_status_code(client);
     char resp_buf[512] = {0};
-    int resp_len = esp_http_client_read(client, resp_buf, sizeof(resp_buf) - 1);
+    int resp_len = 0;
+    if (content_length > 0) {
+        int read_total = 0;
+        while (read_total < content_length && read_total < (int)sizeof(resp_buf) - 1) {
+            int read_now = esp_http_client_read(client, resp_buf + read_total, content_length - read_total);
+            if (read_now <= 0) break;
+            read_total += read_now;
+        }
+        resp_len = read_total;
+    } else {
+        resp_len = esp_http_client_read(client, resp_buf, sizeof(resp_buf) - 1);
+    }
     if (resp_len > 0) resp_buf[resp_len] = '\0';
+    esp_http_client_close(client);
     esp_http_client_cleanup(client);
     free(json);
 
-    ESP_LOGI(TAG, "Ping responded: %d", status);
+    ESP_LOGI(TAG, "Ping responded: %d (body_len=%d)", status, resp_len);
 
     if (status == 200) {
         pnky_409_count = 0;

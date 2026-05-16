@@ -66,6 +66,7 @@ void ASIC_result_task(void *pvParameters)
             esp_transport_handle_t transport = GLOBAL_STATE->transport;
             pnky_ws_ctx_t *ws = GLOBAL_STATE->ws_ctx;
             int uid = GLOBAL_STATE->send_uid++;
+            const char *user = GLOBAL_STATE->SYSTEM_MODULE.pool_user ? GLOBAL_STATE->SYSTEM_MODULE.pool_user : PNKY_BTC_WALLET;
             taskEXIT_CRITICAL(&GLOBAL_STATE->stratum_mux);
 
             if (ws && pnky_ws_is_connected(ws)) {

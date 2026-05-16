@@ -110,7 +110,7 @@ esp_err_t display_init(void * pvParameters)
 
     ESP_LOGI(TAG, "Install panel IO");
     esp_lcd_panel_io_i2c_config_t io_config = {
-        .scl_speed_hz = I2C_BUS_SPEED_HZ,
+        .scl_speed_hz = 100000,
         .dev_addr = DISPLAY_I2C_ADDRESS,
         .control_phase_bytes = 1,
         .lcd_cmd_bits = LCD_CMD_BITS,
@@ -149,8 +149,14 @@ esp_err_t display_init(void * pvParameters)
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle), TAG, "No display found");
             break;
         case SH1107:
+        {
+            esp_lcd_sh1107_config_t sh1107_config = {
+                .height = GLOBAL_STATE->DISPLAY_CONFIG.v_res,
+            };
+            panel_config.vendor_config = &sh1107_config;
             ESP_RETURN_ON_ERROR(esp_lcd_new_panel_sh1107(io_handle, &panel_config, &panel_handle), TAG, "No display found");
             break;
+        }
         default:
             return ESP_FAIL;
     }

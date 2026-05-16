@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_http_client.h"
+#include "esp_crt_bundle.h"
 #include "esp_app_desc.h"
 #include "esp_timer.h"
 #include <string.h>
@@ -25,14 +26,24 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
     char *server_url = pnky_config_get_string(PNKY_KEY_SERVER_URL);
     if (!server_url) return;
 
-    // Fetch latest version
+    if (strncmp(server_url, "https://", 8) == 0) {
+        char *http_url = malloc(strlen(server_url));
+        if (http_url) {
+            snprintf(http_url, strlen(server_url), "http://%s", server_url + 8);
+            free(server_url);
+            server_url = http_url;
+        }
+    }
+
+    // Fetch latest version (platform-specific endpoint)
     char ver_url[256];
-    snprintf(ver_url, sizeof(ver_url), "%s/api/v1/firmware-version", server_url);
+    snprintf(ver_url, sizeof(ver_url), "%s/api/v1/firmware-version/bitaxe-esp32s3", server_url);
 
     esp_http_client_config_t ver_config = {
         .url = ver_url,
         .method = HTTP_METHOD_GET,
         .timeout_ms = 10000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     esp_http_client_handle_t ver_client = esp_http_client_init(&ver_config);
@@ -107,7 +118,7 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
 
     // Download firmware
     char fw_url[512];
-    snprintf(fw_url, sizeof(fw_url), "%s/firmware/esp32s3/firmware.bin", server_url);
+    snprintf(fw_url, sizeof(fw_url), "%s/firmware/bitaxe-esp32s3/firmware.bin", server_url);
     free(server_url);
 
     ESP_LOGI(TAG, "Downloading firmware: %s", fw_url);
@@ -116,6 +127,7 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
         .url = fw_url,
         .method = HTTP_METHOD_GET,
         .timeout_ms = 120000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
     esp_http_client_handle_t dl_client = esp_http_client_init(&dl_config);

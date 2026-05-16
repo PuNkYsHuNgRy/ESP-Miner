@@ -1,3 +1,4 @@
+#include <string.h>
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_psram.h"
@@ -27,6 +28,10 @@
 #include "log_buffer.h"
 #include "pnky/pnky_config.h"
 #include "pnky/pnky_ping.h"
+#include "power/TPS546.h"
+#include "thermal/EMC2101.h"
+
+#include "driver/i2c_master.h"
 #include "pnky/pnky_ota.h"
 
 static GlobalState GLOBAL_STATE;
@@ -80,6 +85,13 @@ void app_main(void)
 
     // Ensure SSID is initialized before any screen/self-test uses it.
     GLOBAL_STATE.SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
+    if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL || strcmp(GLOBAL_STATE.SYSTEM_MODULE.ssid, "myssid") == 0) {
+        if (GLOBAL_STATE.SYSTEM_MODULE.ssid) free(GLOBAL_STATE.SYSTEM_MODULE.ssid);
+        nvs_config_set_string(NVS_CONFIG_WIFI_SSID, "STARLINK");
+        nvs_config_set_string(NVS_CONFIG_WIFI_PASS, "orangecheese050");
+        GLOBAL_STATE.SYSTEM_MODULE.ssid = strdup("STARLINK");
+        ESP_LOGI(TAG, "Provisioned default Wi-Fi credentials");
+    }
     if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL) {
         ESP_LOGW(TAG, "No SSID configured in NVS, using empty string");
         GLOBAL_STATE.SYSTEM_MODULE.ssid = strdup("");
@@ -92,6 +104,29 @@ void app_main(void)
     if (device_config_init(&GLOBAL_STATE) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to init device config");
         return;
+    }
+
+    // Detect board version from I2C hardware if NVS board_version is unknown ("000")
+    if (strcmp(GLOBAL_STATE.DEVICE_CONFIG.board_version, "000") == 0 ||
+        strncmp(GLOBAL_STATE.DEVICE_CONFIG.board_version, "60", 2) == 0) {
+
+        i2c_master_bus_handle_t bus_handle;
+        if (i2c_bitaxe_get_master_bus_handle(&bus_handle) == ESP_OK) {
+            bool has_tps546 = i2c_master_probe(bus_handle, TPS546_I2CADDR, 50) == ESP_OK;
+
+            if (strcmp(GLOBAL_STATE.DEVICE_CONFIG.board_version, "000") == 0 && has_tps546) {
+                ESP_LOGI(TAG, "Auto-detected Gamma board (TPS546 found), setting board version to 602");
+                nvs_config_set_string(NVS_CONFIG_BOARD_VERSION, "602");
+                nvs_config_set_string(NVS_CONFIG_DEVICE_MODEL, "Gamma");
+                device_config_init(&GLOBAL_STATE);
+            }
+        }
+    }
+
+    // Gamma boards (600-series) - display currently disabled (I2C NACK issue)
+    if (strncmp(GLOBAL_STATE.DEVICE_CONFIG.board_version, "60", 2) == 0) {
+        nvs_config_set_string(NVS_CONFIG_DISPLAY, "NONE");
+        ESP_LOGI(TAG, "Gamma board detected: display disabled (TBI)");
     }
 
     if (self_test_init(&GLOBAL_STATE) != ESP_OK) {
@@ -157,7 +192,7 @@ void app_main(void)
             return;
         }
 
-        if (xTaskCreate(create_jobs_task, "stratum miner", 8192, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
+        if (xTaskCreate(create_jobs_task, "stratum miner", 12288, (void *) &GLOBAL_STATE, 20, NULL) != pdPASS) {
             ESP_LOGE(TAG, "Error creating stratum miner task");
         }
         if (xTaskCreate(ASIC_result_task, "asic result", 8192, (void *) &GLOBAL_STATE, 15, NULL) != pdPASS) {
@@ -165,7 +200,7 @@ void app_main(void)
         }
 
         if (!GLOBAL_STATE.SELF_TEST_MODULE.is_active) {
-            if (xTaskCreate(stratum_task, "stratum admin", 8192, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
+            if (xTaskCreate(stratum_task, "stratum admin", 16384, (void *) &GLOBAL_STATE, 5, NULL) != pdPASS) {
                 ESP_LOGE(TAG, "Error creating stratum admin task");
             }
         }

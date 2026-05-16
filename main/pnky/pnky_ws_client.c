@@ -3,8 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include "esp_log.h"
+#include "esp_tls.h"
 #include "esp_transport_tcp.h"
 #include "esp_transport_ssl.h"
+#include "esp_crt_bundle.h"
 #include "mbedtls/base64.h"
 
 static const char *TAG = "pnky_ws";
@@ -34,6 +36,7 @@ pnky_ws_ctx_t *pnky_ws_connect(const char *host, int port, const char *path, boo
             goto fail;
         }
         esp_transport_ssl_set_common_name(transport, host);
+        esp_transport_ssl_crt_bundle_attach(transport, esp_crt_bundle_attach);
     } else {
         transport = esp_transport_tcp_init();
         if (!transport) {

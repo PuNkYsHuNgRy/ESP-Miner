@@ -169,6 +169,10 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
             Validators.required,
             Validators.min(0),
             Validators.max(this.statsFrequencyMaxValue)
+          ]],
+          pnkyWallet: [info.pnkyWallet, [
+            Validators.minLength(0),
+            Validators.maxLength(44)
           ]]
         });
 

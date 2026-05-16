@@ -525,10 +525,14 @@ void stratum_task(void * pvParameters)
             continue;
         }
 
-        bool use_ws = (port == 443 || port == 80 || GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback == false);
+        bool use_ws = (port == 443 || port == 80);
 
-        if (use_ws && !GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
-            ESP_LOGI(TAG, "Connecting via WSS to %s:%d", stratum_url, port);
+        if (use_ws) {
+            if (!GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback) {
+                ESP_LOGI(TAG, "Connecting via WSS to %s:%d", stratum_url, port);
+            } else {
+                ESP_LOGI(TAG, "Connecting via WSS (fallback) to %s:%d", stratum_url, port);
+            }
 
             pnky_ws_ctx_t *ws = pnky_ws_connect(stratum_url, port, "/", true);
             if (!ws) {
@@ -733,10 +737,12 @@ void stratum_task(void * pvParameters)
             STRATUM_V1_configure_version_rolling(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), &GLOBAL_STATE->version_mask);
             STRATUM_V1_subscribe(GLOBAL_STATE->transport, stratum_get_next_uid(GLOBAL_STATE), GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
 
-            char *username = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_user : GLOBAL_STATE->SYSTEM_MODULE.pool_user;
+            const char *device_id = pnky_config_get_device_id();
+            char username_buf[128];
+            snprintf(username_buf, sizeof(username_buf), "%s.%s", PNKY_BTC_WALLET, device_id);
             char *password = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_pass : GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
             int authorize_message_id = stratum_get_next_uid(GLOBAL_STATE);
-            STRATUM_V1_authorize(GLOBAL_STATE->transport, authorize_message_id, username, password);
+            STRATUM_V1_authorize(GLOBAL_STATE->transport, authorize_message_id, username_buf, password ? password : "");
 
             while (1) {
                 char *line = STRATUM_V1_receive_jsonrpc_line(GLOBAL_STATE->transport);

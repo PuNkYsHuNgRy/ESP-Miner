@@ -48,6 +48,7 @@
 #include "websocket.h"
 #include "log_buffer.h"
 #include "utils.h"
+#include "pnky/pnky_config.h"
 
 static const char * TAG = "http_server";
 static const char * CORS_TAG = "CORS";
@@ -684,6 +685,12 @@ static esp_err_t PATCH_update_settings(httpd_req_t * req)
         return ESP_OK;
     }
 
+    cJSON *pnky_wallet = cJSON_GetObjectItem(root, "pnkyWallet");
+    if (pnky_wallet && cJSON_IsString(pnky_wallet)) {
+        pnky_config_set_string(PNKY_KEY_SOLANA_WALLET, pnky_wallet->valuestring);
+        ESP_LOGI(TAG, "Updated PNKY wallet: %s", pnky_wallet->valuestring);
+    }
+
     cJSON_Delete(root);
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
@@ -983,6 +990,11 @@ static esp_err_t GET_system_info(httpd_req_t * req)
     cJSON_AddNumberToObject(root, "fallbackStratumTLS", nvs_config_get_u16(NVS_CONFIG_FALLBACK_STRATUM_TLS));
     cJSON_AddStringToObject(root, "fallbackStratumCert", fallbackStratumCert);
     cJSON_AddNumberToObject(root, "fallbackStratumDecodeCoinbase", nvs_config_get_bool(NVS_CONFIG_FALLBACK_STRATUM_DECODE_COINBASE_TX));
+
+    char *pnky_wallet = pnky_config_get_string(PNKY_KEY_SOLANA_WALLET);
+    cJSON_AddStringToObject(root, "pnkyWallet", pnky_wallet ? pnky_wallet : "");
+    if (pnky_wallet) free(pnky_wallet);
+
     cJSON_AddFloatToObject(root, "responseTime", GLOBAL_STATE->SYSTEM_MODULE.response_time);
     cJSON_AddFloatToObject(root, "cpuUsage", GLOBAL_STATE->SYSTEM_MODULE.cpu_usage);
 

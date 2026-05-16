@@ -424,6 +424,13 @@ void nvs_config_set_string(NvsConfigKey key, const char *value)
     Settings *setting = nvs_config_get_settings(key);
     if (!setting || setting->type != TYPE_STR || (setting->value[0].str && strcmp(setting->value[0].str, value) == 0)) return;
 
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (setting->value[0].str) {
+        free(setting->value[0].str);
+    }
+    setting->value[0].str = strdup(value);
+    xSemaphoreGive(nvs_cache_mutex);
+
     ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value) };
     if (!update.value.str) return;
     xQueueSend(nvs_save_queue, &update, portMAX_DELAY);
@@ -435,6 +442,13 @@ void nvs_config_set_string_indexed(NvsConfigKey key, int index, const char *valu
     if (!setting || setting->type != TYPE_STR || setting->array_size < 1) return;
     if (index < 0 || index >= setting->array_size) return;
     if (setting->value[index].str && strcmp(setting->value[index].str, value) == 0) return;
+
+    xSemaphoreTake(nvs_cache_mutex, portMAX_DELAY);
+    if (setting->value[index].str) {
+        free(setting->value[index].str);
+    }
+    setting->value[index].str = strdup(value);
+    xSemaphoreGive(nvs_cache_mutex);
 
     ConfigUpdate update = { .key = key, .type = TYPE_STR, .value.str = strdup(value), .index = index };
     if (!update.value.str) return;

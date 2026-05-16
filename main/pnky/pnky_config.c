@@ -25,7 +25,7 @@ static const char *pnky_defaults[PNKY_KEY_COUNT] = {
     "",
     "",
     "",
-    "https://norugcoin.punkyshungry.com",
+    "http://norugcoin.punkyshungry.com",
     "60"
 };
 
