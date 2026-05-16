@@ -101,13 +101,14 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
     }
 
     // Parse versions (strip non-numeric prefix)
-    int cur_major = 0, cur_minor = 0;
-    int lat_major = 0, lat_minor = 0;
-    sscanf(current_ver, "%*[^0-9]%d.%d", &cur_major, &cur_minor);
-    sscanf(latest_ver, "%*[^0-9]%d.%d", &lat_major, &lat_minor);
+    int cur_major = 0, cur_minor = 0, cur_patch = 0;
+    int lat_major = 0, lat_minor = 0, lat_patch = 0;
+    sscanf(current_ver, "%*[^0-9]%d.%d.%d", &cur_major, &cur_minor, &cur_patch);
+    sscanf(latest_ver, "%*[^0-9]%d.%d.%d", &lat_major, &lat_minor, &lat_patch);
 
     if (lat_major < cur_major ||
-        (lat_major == cur_major && lat_minor <= cur_minor)) {
+        (lat_major == cur_major && lat_minor < cur_minor) ||
+        (lat_major == cur_major && lat_minor == cur_minor && lat_patch <= cur_patch)) {
         ESP_LOGI(TAG, "Up to date (current: %s, server: %s)", current_ver, latest_ver);
         free(server_url);
         return;
