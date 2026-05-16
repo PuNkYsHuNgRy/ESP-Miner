@@ -670,14 +670,13 @@ void stratum_task(void * pvParameters)
                     float rtt = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
                     if (stratum_api_v1_message.response_success) {
                         ESP_LOGI(TAG, "message result accepted");
+                        SYSTEM_notify_accepted_share(GLOBAL_STATE);
                         if (rtt >= 0) {
                             GLOBAL_STATE->SYSTEM_MODULE.response_time = rtt;
-                            SYSTEM_notify_accepted_share(GLOBAL_STATE);
                         }
                     } else {
                         ESP_LOGW(TAG, "message rejected: %s", stratum_api_v1_message.error_str);
-                        if (rtt >= 0)
-                            SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
+                        SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
                     }
                 } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
                     retry_attempts = 0;
@@ -799,13 +798,12 @@ void stratum_task(void * pvParameters)
                 } else if (stratum_api_v1_message.method == STRATUM_RESULT) {
                     float rtt = STRATUM_V1_get_response_time_ms(stratum_api_v1_message.message_id, receive_time_us);
                     if (stratum_api_v1_message.response_success) {
+                        SYSTEM_notify_accepted_share(GLOBAL_STATE);
                         if (rtt >= 0) {
                             GLOBAL_STATE->SYSTEM_MODULE.response_time = rtt;
-                            SYSTEM_notify_accepted_share(GLOBAL_STATE);
                         }
                     } else {
-                        if (rtt >= 0)
-                            SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
+                        SYSTEM_notify_rejected_share(GLOBAL_STATE, stratum_api_v1_message.error_str);
                     }
                 } else if (stratum_api_v1_message.method == STRATUM_RESULT_SETUP) {
                     retry_attempts = 0;
