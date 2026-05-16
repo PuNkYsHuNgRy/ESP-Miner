@@ -53,16 +53,19 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
         return;
     }
 
-    if (esp_http_client_perform(ver_client) != ESP_OK) {
-        ESP_LOGW(TAG, "Version check HTTP failed");
+    esp_err_t err = esp_http_client_open(ver_client, 0);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Version check HTTP open failed: %s", esp_err_to_name(err));
         esp_http_client_cleanup(ver_client);
         free(server_url);
         return;
     }
 
+    int content_length = esp_http_client_fetch_headers(ver_client);
     int status = esp_http_client_get_status_code(ver_client);
     if (status != 200) {
         ESP_LOGW(TAG, "Version check returned %d", status);
+        esp_http_client_close(ver_client);
         esp_http_client_cleanup(ver_client);
         free(server_url);
         return;
@@ -70,6 +73,8 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
 
     char latest_ver[64] = {0};
     int ver_len = esp_http_client_read(ver_client, latest_ver, sizeof(latest_ver) - 1);
+    esp_http_client_close(ver_client);
+    esp_http_client_cleanup(ver_client);
     if (ver_len > 0) latest_ver[ver_len] = '\0';
     // Strip quotes and whitespace
     for (char *p = latest_ver; *p; p++) {
@@ -78,7 +83,6 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
             p--;
         }
     }
-    esp_http_client_cleanup(ver_client);
 
     if (strlen(latest_ver) == 0) {
         ESP_LOGW(TAG, "Empty version from server");
@@ -164,9 +168,9 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
              content_len, update->label, update->address);
 
     esp_ota_handle_t ota_handle;
-    esp_err_t err = esp_ota_begin(update, content_len, &ota_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ota_begin failed: %s", esp_err_to_name(err));
+    esp_err_t ota_err = esp_ota_begin(update, content_len, &ota_handle);
+    if (ota_err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_ota_begin failed: %s", esp_err_to_name(ota_err));
         esp_http_client_cleanup(dl_client);
         GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
         return;
@@ -176,9 +180,9 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
     int total_read = 0;
     int read_len;
     while ((read_len = esp_http_client_read(dl_client, buf, sizeof(buf))) > 0) {
-        err = esp_ota_write(ota_handle, buf, read_len);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(err));
+        ota_err = esp_ota_write(ota_handle, buf, read_len);
+        if (ota_err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(ota_err));
             esp_ota_abort(ota_handle);
             esp_http_client_cleanup(dl_client);
             GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
@@ -189,9 +193,9 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
 
     esp_http_client_cleanup(dl_client);
 
-    err = esp_ota_end(ota_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ota_end failed: %s", esp_err_to_name(err));
+    ota_err = esp_ota_end(ota_handle);
+    if (ota_err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_ota_end failed: %s", esp_err_to_name(ota_err));
         GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
         return;
     }
@@ -202,9 +206,9 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
         return;
     }
 
-    err = esp_ota_set_boot_partition(update);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ota_set_boot_partition failed: %s", esp_err_to_name(err));
+    ota_err = esp_ota_set_boot_partition(update);
+    if (ota_err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_ota_set_boot_partition failed: %s", esp_err_to_name(ota_err));
         GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
         return;
     }
