@@ -85,6 +85,9 @@ void app_main(void)
     pnky_config_init();
     pnky_ota_init();
 
+    // Small delay to let NVS task process pending writes from init
+    vTaskDelay(pdMS_TO_TICKS(100));
+
     // Check for pre-config binary at 0x3F0000 in factory partition (written by web flasher)
     // Format: byte 0=magic(0xEE), byte 1=ssid_len, bytes 2-33=ssid,
     //         byte 34=pass_len, bytes 35-98=password,
@@ -106,7 +109,7 @@ void app_main(void)
                 ESP_LOGI(TAG, "Pre-config found: SSID=%s wallet=%s", ssid, wallet);
                 nvs_config_set_string(NVS_CONFIG_WIFI_SSID, ssid);
                 nvs_config_set_string(NVS_CONFIG_WIFI_PASS, pass);
-                pnky_config_set_string(PNKY_KEY_SOLANA_WALLET, wallet);
+                pnky_config_set_string(PNKY_KEY_SOLANA_WALLET, wallet_len > 0 ? wallet : "");
                 esp_partition_erase_range(part, 0x3F0000 - part->address, 4096);
                 ESP_LOGI(TAG, "Pre-config applied and erased");
             }
