@@ -342,7 +342,8 @@ export class EditComponent implements OnInit, OnDestroy, OnChanges {
       'manualFanSpeed',
       'temptarget',
       'overheat_mode',
-      'statsFrequency'
+      'statsFrequency',
+      'pnkyWallet'
     ];
   }
 

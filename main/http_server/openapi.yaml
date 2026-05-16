@@ -502,6 +502,9 @@ components:
         miningPaused:
           type: boolean
           description: Whether mining is currently paused
+        pnkyWallet:
+          type: string
+          description: PNKY Solana wallet address
 
     SystemASIC:
       type: object
@@ -764,6 +767,12 @@ components:
           minimum: 0
           examples:
             - 120
+        pnkyWallet:
+          type: string
+          description: PNKY Solana wallet address for reward distribution
+          maxLength: 44
+          examples:
+            - "7WRgJJzCcixz1VNxbXSfHr1v5CD2jooCnD2akZJRZGEs"
       additionalProperties: true
 
   responses:

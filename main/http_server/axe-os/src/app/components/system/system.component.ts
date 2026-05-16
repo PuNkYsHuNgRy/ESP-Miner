@@ -103,6 +103,7 @@ export class SystemComponent implements OnInit, OnDestroy {
       { label: 'Firmware Version', value: data.info.version },
       { label: 'AxeOS Version', value: data.info.axeOSVersion },
       { label: 'ESP-IDF Version', value: data.info.idfVersion },
+      { label: 'PNKY Wallet', value: data.info.pnkyWallet ? (data.info.pnkyWallet.substring(0, 4) + '...' + data.info.pnkyWallet.slice(-4)) : 'Not configured' },
     ];
   }
 
