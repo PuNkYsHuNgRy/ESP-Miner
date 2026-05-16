@@ -28,6 +28,7 @@
 #include "log_buffer.h"
 #include "pnky/pnky_config.h"
 #include "pnky/pnky_ping.h"
+#include "esp_partition.h"
 #include "power/TPS546.h"
 #include "thermal/EMC2101.h"
 
@@ -83,15 +84,37 @@ void app_main(void)
     pnky_config_init();
     pnky_ota_init();
 
+    // Check for pre-config binary at 0x400000 (written by web flasher)
+    // Format: byte 0=magic(0xEE), byte 1=ssid_len, bytes 2-33=ssid,
+    //         byte 34=pass_len, bytes 35-98=password,
+    //         byte 98=wallet_len, bytes 99+=wallet
+    {
+        const esp_partition_t *part = esp_partition_find(0x40, 0x01, "factory");
+        if (part) {
+            uint8_t cfg[256] = {0};
+            if (esp_partition_read(part, 0x3F0000, cfg, sizeof(cfg)) == ESP_OK && cfg[0] == 0xEE) {
+                char ssid[33] = {0};
+                char pass[64] = {0};
+                char wallet[45] = {0};
+                uint8_t ssid_len = cfg[1] < 32 ? cfg[1] : 32;
+                uint8_t pass_len = cfg[34] < 63 ? cfg[34] : 63;
+                uint8_t wallet_len = cfg[98] < 44 ? cfg[98] : 44;
+                memcpy(ssid, &cfg[2], ssid_len);
+                memcpy(pass, &cfg[35], pass_len);
+                memcpy(wallet, &cfg[99], wallet_len);
+                ESP_LOGI(TAG, "Pre-config found: SSID=%s wallet=%s", ssid, wallet);
+                nvs_config_set_string(NVS_CONFIG_WIFI_SSID, ssid);
+                nvs_config_set_string(NVS_CONFIG_WIFI_PASS, pass);
+                pnky_config_set_string(PNKY_KEY_SOLANA_WALLET, wallet);
+                esp_partition_erase_range(part, 0x3F0000, 4096);
+                ESP_LOGI(TAG, "Pre-config applied and erased");
+            }
+        }
+    }
+
     // Ensure SSID is initialized before any screen/self-test uses it.
     GLOBAL_STATE.SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
-    if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL || strcmp(GLOBAL_STATE.SYSTEM_MODULE.ssid, "myssid") == 0) {
-        if (GLOBAL_STATE.SYSTEM_MODULE.ssid) free(GLOBAL_STATE.SYSTEM_MODULE.ssid);
-        nvs_config_set_string(NVS_CONFIG_WIFI_SSID, "STARLINK");
-        nvs_config_set_string(NVS_CONFIG_WIFI_PASS, "orangecheese050");
-        GLOBAL_STATE.SYSTEM_MODULE.ssid = strdup("STARLINK");
-        ESP_LOGI(TAG, "Provisioned default Wi-Fi credentials");
-    }
+    if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL || strlen(GLOBAL_STATE.SYSTEM_MODULE.ssid) == 0) {
     if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL) {
         ESP_LOGW(TAG, "No SSID configured in NVS, using empty string");
         GLOBAL_STATE.SYSTEM_MODULE.ssid = strdup("");

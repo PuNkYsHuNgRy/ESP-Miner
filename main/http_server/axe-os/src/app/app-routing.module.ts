@@ -4,13 +4,11 @@ import { RouterModule, Routes } from '@angular/router';
 import { HomeComponent } from './components/home/home.component';
 import { LogsComponent } from './components/logs/logs.component';
 import { SystemComponent } from './components/system/system.component';
-import { UpdateComponent } from './components/update/update.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { NetworkComponent } from './components/network/network.component';
 import { SwarmComponent } from './components/swarm/swarm.component';
 import { ScoreboardComponent } from './components/scoreboard/scoreboard.component';
 import { DesignComponent } from './components/design/design.component';
-import { PoolComponent } from './components/pool/pool.component';
 import { AppLayoutComponent } from './layout/app.layout.component';
 import { ApModeGuard } from './guards/ap-mode.guard';
 
@@ -49,11 +47,6 @@ const routes: Routes = [
         title: `${TITLE_PREFIX} System`,
       },
       {
-        path: 'update',
-        component: UpdateComponent,
-        title: `${TITLE_PREFIX} Update`,
-      },
-      {
         path: 'network',
         component: NetworkComponent,
         title: `${TITLE_PREFIX} Network`,
@@ -78,11 +71,6 @@ const routes: Routes = [
         component: DesignComponent,
         title: `${TITLE_PREFIX} Theme`,
       },
-      {
-        path: 'pool',
-        component: PoolComponent,
-        title: `${TITLE_PREFIX} Pool`,
-      }
     ]
   },
 
