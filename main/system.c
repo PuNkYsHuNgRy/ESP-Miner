@@ -176,9 +176,9 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
 
     ret = display_init(GLOBAL_STATE);
     if (ret != ESP_OK) {
-        self_test_show_message(GLOBAL_STATE, "DISPLAY:FAIL");
-        ESP_LOGE(TAG, "Display init failed");
-        return ret;
+        ESP_LOGW(TAG, "Display init failed, continuing without display");
+        GLOBAL_STATE->DISPLAY_CONFIG.display = NONE;
+        GLOBAL_STATE->SYSTEM_MODULE.is_screen_active = false;
     }
 
     if (!GLOBAL_STATE->SELF_TEST_MODULE.is_active) {

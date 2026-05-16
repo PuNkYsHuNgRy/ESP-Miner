@@ -156,9 +156,14 @@ void app_main(void)
         }
     }
 
-    // Gamma boards (600-series) - auto-detect display
+    // Gamma boards (600-series) - ensure display is set (NVS may have NONE from prior firmware)
     if (strncmp(GLOBAL_STATE.DEVICE_CONFIG.board_version, "60", 2) == 0) {
-        ESP_LOGI(TAG, "Gamma board detected: display will be auto-detected");
+        char *cur_display = nvs_config_get_string(NVS_CONFIG_DISPLAY);
+        if (strcmp(cur_display, "NONE") == 0) {
+            ESP_LOGI(TAG, "Gamma board: overriding NONE display to SSD1306");
+            nvs_config_set_string(NVS_CONFIG_DISPLAY, "SSD1306 (128x32)");
+        }
+        free(cur_display);
     }
 
     // On fresh flash, NVS frequency/voltage may be wrong Kconfig defaults.

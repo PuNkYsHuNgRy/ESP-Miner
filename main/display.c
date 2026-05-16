@@ -108,6 +108,19 @@ esp_err_t display_init(void * pvParameters)
     i2c_master_bus_handle_t i2c_master_bus_handle;
     ESP_RETURN_ON_ERROR(i2c_bitaxe_get_master_bus_handle(&i2c_master_bus_handle), TAG, "Failed to get i2c master bus handle");
 
+    // Probe for display before trying to init
+    if (i2c_master_probe(i2c_master_bus_handle, DISPLAY_I2C_ADDRESS, 50) != ESP_OK) {
+        ESP_LOGW(TAG, "No display found at 0x%02X, disabling display", DISPLAY_I2C_ADDRESS);
+        GLOBAL_STATE->DISPLAY_CONFIG.display = NONE;
+        ESP_LOGI(TAG, "Initialize LVGL (no display)");
+        ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL init failed");
+        if (lvgl_port_lock(0)) {
+            lv_display_create(1, 1);
+            lvgl_port_unlock();
+        }
+        return ESP_OK;
+    }
+
     ESP_LOGI(TAG, "Install panel IO");
     esp_lcd_panel_io_i2c_config_t io_config = {
         .scl_speed_hz = 100000,
