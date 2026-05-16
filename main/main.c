@@ -156,10 +156,9 @@ void app_main(void)
         }
     }
 
-    // Gamma boards (600-series) - display currently disabled (I2C NACK issue)
+    // Gamma boards (600-series) - auto-detect display
     if (strncmp(GLOBAL_STATE.DEVICE_CONFIG.board_version, "60", 2) == 0) {
-        nvs_config_set_string(NVS_CONFIG_DISPLAY, "NONE");
-        ESP_LOGI(TAG, "Gamma board detected: display disabled (TBI)");
+        ESP_LOGI(TAG, "Gamma board detected: display will be auto-detected");
     }
 
     // On fresh flash, NVS frequency/voltage may be wrong Kconfig defaults.
