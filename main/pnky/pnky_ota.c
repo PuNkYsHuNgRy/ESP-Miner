@@ -12,6 +12,7 @@
 static const char *TAG = "pnky_ota";
 
 #define PNKY_OTA_CHECK_INTERVAL_US (3600ULL * 1000000ULL)
+#define OTA_MAX_RETRIES 3
 
 static void pnky_ota_check(GlobalState *GLOBAL_STATE)
 {
@@ -25,15 +26,6 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
 
     char *server_url = pnky_config_get_string(PNKY_KEY_SERVER_URL);
     if (!server_url) return;
-
-    if (strncmp(server_url, "https://", 8) == 0) {
-        char *http_url = malloc(strlen(server_url));
-        if (http_url) {
-            snprintf(http_url, strlen(server_url), "http://%s", server_url + 8);
-            free(server_url);
-            server_url = http_url;
-        }
-    }
 
     // Fetch latest version (platform-specific endpoint)
     char ver_url[256];
@@ -126,92 +118,116 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
     snprintf(fw_url, sizeof(fw_url), "%s/firmware/bitaxe-esp32s3/firmware.bin", server_url);
     free(server_url);
 
-    ESP_LOGI(TAG, "Downloading firmware: %s", fw_url);
-
     esp_http_client_config_t dl_config = {
         .url = fw_url,
         .method = HTTP_METHOD_GET,
-        .timeout_ms = 120000,
+        .timeout_ms = 30000,
         .crt_bundle_attach = esp_crt_bundle_attach,
+        .buffer_size = 4096,
+        .buffer_size_tx = 4096,
     };
 
-    esp_http_client_handle_t dl_client = esp_http_client_init(&dl_config);
-    if (!dl_client) {
-        ESP_LOGE(TAG, "Failed to init HTTP client for download");
-        GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
-        return;
-    }
-
-    esp_err_t dl_err = esp_http_client_open(dl_client, 0);
-    if (dl_err != ESP_OK) {
-        ESP_LOGE(TAG, "Download HTTP open failed: %s", esp_err_to_name(dl_err));
-        esp_http_client_cleanup(dl_client);
-        GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
-        return;
-    }
-
-    int content_len = esp_http_client_fetch_headers(dl_client);
-    int dl_status = esp_http_client_get_status_code(dl_client);
-    if (dl_status != 200) {
-        ESP_LOGE(TAG, "Download returned %d", dl_status);
-        esp_http_client_close(dl_client);
-        esp_http_client_cleanup(dl_client);
-        GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
-        return;
-    }
-
-    if (content_len <= 0) {
-        ESP_LOGE(TAG, "Invalid firmware size: %d", content_len);
-        esp_http_client_close(dl_client);
-        esp_http_client_cleanup(dl_client);
-        GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
-        return;
-    }
-
-    ESP_LOGI(TAG, "Firmware size: %d bytes (partition: %s @ 0x%x)",
-             content_len, update->label, update->address);
-
-    esp_ota_handle_t ota_handle;
-    esp_err_t ota_err = esp_ota_begin(update, content_len, &ota_handle);
-    if (ota_err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ota_begin failed: %s", esp_err_to_name(ota_err));
-        esp_http_client_cleanup(dl_client);
-        GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
-        return;
-    }
-
-    char buf[1024];
     int total_read = 0;
-    int read_len;
-    while ((read_len = esp_http_client_read(dl_client, buf, sizeof(buf))) > 0) {
-        ota_err = esp_ota_write(ota_handle, buf, read_len);
-        if (ota_err != ESP_OK) {
-            ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(ota_err));
-            esp_ota_abort(ota_handle);
-esp_http_client_close(dl_client);
-    esp_http_client_cleanup(dl_client);
-            GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
-            return;
+    int content_len = 0;
+    bool download_ok = false;
+
+    for (int retry = 0; retry < OTA_MAX_RETRIES; retry++) {
+        if (retry > 0) {
+            ESP_LOGI(TAG, "Retrying download (attempt %d/%d)...", retry + 1, OTA_MAX_RETRIES);
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
         }
-        total_read += read_len;
+
+        esp_http_client_handle_t dl_client = esp_http_client_init(&dl_config);
+        if (!dl_client) {
+            ESP_LOGE(TAG, "Failed to init HTTP client for download");
+            continue;
+        }
+
+        esp_err_t dl_err = esp_http_client_open(dl_client, 0);
+        if (dl_err != ESP_OK) {
+            ESP_LOGE(TAG, "Download HTTP open failed: %s", esp_err_to_name(dl_err));
+            esp_http_client_cleanup(dl_client);
+            continue;
+        }
+
+        content_len = esp_http_client_fetch_headers(dl_client);
+        int dl_status = esp_http_client_get_status_code(dl_client);
+        if (dl_status != 200) {
+            ESP_LOGE(TAG, "Download returned %d", dl_status);
+            esp_http_client_close(dl_client);
+            esp_http_client_cleanup(dl_client);
+            continue;
+        }
+
+        if (content_len <= 0) {
+            ESP_LOGE(TAG, "Invalid firmware size: %d", content_len);
+            esp_http_client_close(dl_client);
+            esp_http_client_cleanup(dl_client);
+            continue;
+        }
+
+        ESP_LOGI(TAG, "Firmware size: %d bytes (partition: %s @ 0x%x)",
+                 content_len, update->label, update->address);
+
+        esp_ota_handle_t ota_handle;
+        esp_err_t ota_err = esp_ota_begin(update, content_len, &ota_handle);
+        if (ota_err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_begin failed: %s", esp_err_to_name(ota_err));
+            esp_http_client_close(dl_client);
+            esp_http_client_cleanup(dl_client);
+            continue;
+        }
+
+        char buf[4096];
+        total_read = 0;
+        int read_len;
+        bool download_error = false;
+
+        while ((read_len = esp_http_client_read(dl_client, buf, sizeof(buf))) > 0) {
+            ota_err = esp_ota_write(ota_handle, buf, read_len);
+            if (ota_err != ESP_OK) {
+                ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(ota_err));
+                esp_ota_abort(ota_handle);
+                download_error = true;
+                break;
+            }
+            total_read += read_len;
+
+            // Log progress every 256KB
+            if (total_read % (256 * 1024) == 0) {
+                ESP_LOGI(TAG, "Download progress: %d/%d bytes (%d%%)",
+                         total_read, content_len, total_read * 100 / content_len);
+            }
+        }
+
+        esp_http_client_close(dl_client);
+        esp_http_client_cleanup(dl_client);
+
+        if (download_error) continue;
+
+        if (total_read != content_len) {
+            ESP_LOGW(TAG, "Download incomplete: %d/%d bytes, retrying...", total_read, content_len);
+            esp_ota_abort(ota_handle);
+            continue;
+        }
+
+        ota_err = esp_ota_end(ota_handle);
+        if (ota_err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_end failed: %s", esp_err_to_name(ota_err));
+            continue;
+        }
+
+        download_ok = true;
+        break;
     }
 
-    esp_http_client_cleanup(dl_client);
-
-    ota_err = esp_ota_end(ota_handle);
-    if (ota_err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ota_end failed: %s", esp_err_to_name(ota_err));
+    if (!download_ok) {
+        ESP_LOGE(TAG, "OTA download failed after %d retries", OTA_MAX_RETRIES);
         GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
         return;
     }
 
-    if (total_read != content_len) {
-        ESP_LOGE(TAG, "Download incomplete: %d/%d bytes", total_read, content_len);
-        GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
-        return;
-    }
-
-    ota_err = esp_ota_set_boot_partition(update);
+    esp_err_t ota_err = esp_ota_set_boot_partition(update);
     if (ota_err != ESP_OK) {
         ESP_LOGE(TAG, "esp_ota_set_boot_partition failed: %s", esp_err_to_name(ota_err));
         GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
