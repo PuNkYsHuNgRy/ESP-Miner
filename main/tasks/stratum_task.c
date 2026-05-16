@@ -487,6 +487,11 @@ void stratum_task(void * pvParameters)
             continue;
         }
 
+        if (GLOBAL_STATE->SYSTEM_MODULE.mining_paused) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
         if (!is_wifi_connected()) {
             ESP_LOGI(TAG, "WiFi disconnected, attempting to reconnect...");
             vTaskDelay(10000 / portTICK_PERIOD_MS);

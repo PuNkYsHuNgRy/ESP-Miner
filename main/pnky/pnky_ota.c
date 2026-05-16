@@ -1,5 +1,6 @@
 #include "pnky_ota.h"
 #include "pnky_config.h"
+#include "stratum_task.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_http_client.h"
@@ -111,16 +112,8 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
     // Pause mining and disconnect stratum to free network for OTA
     GLOBAL_STATE->SYSTEM_MODULE.mining_paused = true;
     ESP_LOGI(TAG, "Pausing mining for OTA...");
-    if (GLOBAL_STATE->ws_ctx) {
-        ESP_LOGI(TAG, "Disconnecting WSS for OTA...");
-        pnky_ws_disconnect(GLOBAL_STATE->ws_ctx);
-        pnky_ws_free(GLOBAL_STATE->ws_ctx);
-        GLOBAL_STATE->ws_ctx = NULL;
-    } else if (GLOBAL_STATE->transport) {
-        ESP_LOGI(TAG, "Disconnecting TCP stratum for OTA...");
-        esp_transport_close(GLOBAL_STATE->transport);
-        GLOBAL_STATE->transport = NULL;
-    }
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+    stratum_close_connection(GLOBAL_STATE);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     // Download firmware
