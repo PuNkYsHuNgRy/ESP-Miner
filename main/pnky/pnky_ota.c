@@ -142,24 +142,27 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
         return;
     }
 
-    if (esp_http_client_perform(dl_client) != ESP_OK) {
-        ESP_LOGE(TAG, "Download HTTP failed");
+    esp_err_t dl_err = esp_http_client_open(dl_client, 0);
+    if (dl_err != ESP_OK) {
+        ESP_LOGE(TAG, "Download HTTP open failed: %s", esp_err_to_name(dl_err));
         esp_http_client_cleanup(dl_client);
         GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
         return;
     }
 
+    int content_len = esp_http_client_fetch_headers(dl_client);
     int dl_status = esp_http_client_get_status_code(dl_client);
     if (dl_status != 200) {
         ESP_LOGE(TAG, "Download returned %d", dl_status);
+        esp_http_client_close(dl_client);
         esp_http_client_cleanup(dl_client);
         GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
         return;
     }
 
-    int content_len = esp_http_client_get_content_length(dl_client);
     if (content_len <= 0) {
         ESP_LOGE(TAG, "Invalid firmware size: %d", content_len);
+        esp_http_client_close(dl_client);
         esp_http_client_cleanup(dl_client);
         GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
         return;
@@ -185,7 +188,8 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
         if (ota_err != ESP_OK) {
             ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(ota_err));
             esp_ota_abort(ota_handle);
-            esp_http_client_cleanup(dl_client);
+esp_http_client_close(dl_client);
+    esp_http_client_cleanup(dl_client);
             GLOBAL_STATE->SYSTEM_MODULE.mining_paused = false;
             return;
         }
