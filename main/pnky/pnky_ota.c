@@ -108,10 +108,20 @@ static void pnky_ota_check(GlobalState *GLOBAL_STATE)
 
     ESP_LOGI(TAG, "Update available: %s (current: %s)", latest_ver, current_ver);
 
-    // Pause mining
+    // Pause mining and disconnect stratum to free network for OTA
     GLOBAL_STATE->SYSTEM_MODULE.mining_paused = true;
     ESP_LOGI(TAG, "Pausing mining for OTA...");
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+    if (GLOBAL_STATE->ws_ctx) {
+        ESP_LOGI(TAG, "Disconnecting WSS for OTA...");
+        pnky_ws_disconnect(GLOBAL_STATE->ws_ctx);
+        pnky_ws_free(GLOBAL_STATE->ws_ctx);
+        GLOBAL_STATE->ws_ctx = NULL;
+    } else if (GLOBAL_STATE->transport) {
+        ESP_LOGI(TAG, "Disconnecting TCP stratum for OTA...");
+        esp_transport_close(GLOBAL_STATE->transport);
+        GLOBAL_STATE->transport = NULL;
+    }
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     // Download firmware
     char fw_url[512];
