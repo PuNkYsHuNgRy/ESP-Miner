@@ -84,15 +84,15 @@ void app_main(void)
     pnky_config_init();
     pnky_ota_init();
 
-    // Check for pre-config binary at 0x400000 (written by web flasher)
+    // Check for pre-config binary at 0x3F0000 in factory partition (written by web flasher)
     // Format: byte 0=magic(0xEE), byte 1=ssid_len, bytes 2-33=ssid,
     //         byte 34=pass_len, bytes 35-98=password,
     //         byte 98=wallet_len, bytes 99+=wallet
     {
-        const esp_partition_t *part = esp_partition_find(0x40, 0x01, "factory");
+        const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, "factory");
         if (part) {
             uint8_t cfg[256] = {0};
-            if (esp_partition_read(part, 0x3F0000, cfg, sizeof(cfg)) == ESP_OK && cfg[0] == 0xEE) {
+            if (esp_partition_read(part, 0x3F0000 - part->address, cfg, sizeof(cfg)) == ESP_OK && cfg[0] == 0xEE) {
                 char ssid[33] = {0};
                 char pass[64] = {0};
                 char wallet[45] = {0};
@@ -106,7 +106,7 @@ void app_main(void)
                 nvs_config_set_string(NVS_CONFIG_WIFI_SSID, ssid);
                 nvs_config_set_string(NVS_CONFIG_WIFI_PASS, pass);
                 pnky_config_set_string(PNKY_KEY_SOLANA_WALLET, wallet);
-                esp_partition_erase_range(part, 0x3F0000, 4096);
+                esp_partition_erase_range(part, 0x3F0000 - part->address, 4096);
                 ESP_LOGI(TAG, "Pre-config applied and erased");
             }
         }
@@ -115,7 +115,6 @@ void app_main(void)
     // Ensure SSID is initialized before any screen/self-test uses it.
     GLOBAL_STATE.SYSTEM_MODULE.ssid = nvs_config_get_string(NVS_CONFIG_WIFI_SSID);
     if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL || strlen(GLOBAL_STATE.SYSTEM_MODULE.ssid) == 0) {
-    if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL) {
         ESP_LOGW(TAG, "No SSID configured in NVS, using empty string");
         GLOBAL_STATE.SYSTEM_MODULE.ssid = strdup("");
         if (GLOBAL_STATE.SYSTEM_MODULE.ssid == NULL) {
