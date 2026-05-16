@@ -31,6 +31,7 @@
 #include "esp_partition.h"
 #include "power/TPS546.h"
 #include "thermal/EMC2101.h"
+#include "device_config.h"
 
 #include "driver/i2c_master.h"
 #include "pnky/pnky_ota.h"
@@ -149,6 +150,24 @@ void app_main(void)
     if (strncmp(GLOBAL_STATE.DEVICE_CONFIG.board_version, "60", 2) == 0) {
         nvs_config_set_string(NVS_CONFIG_DISPLAY, "NONE");
         ESP_LOGI(TAG, "Gamma board detected: display disabled (TBI)");
+    }
+
+    // On fresh flash, NVS frequency/voltage may be wrong Kconfig defaults.
+    // Set proper ASIC defaults based on detected board model.
+    {
+        float cur_freq = nvs_config_get_float(NVS_CONFIG_ASIC_FREQUENCY);
+        uint16_t cur_volt = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
+        const AsicConfig *asic = &GLOBAL_STATE.DEVICE_CONFIG.family.asic;
+        if (cur_freq <= 300 || cur_freq != asic->default_frequency_mhz) {
+            ESP_LOGW(TAG, "ASIC frequency %.0f MHz looks wrong for %s, setting default %d MHz",
+                     cur_freq, asic->name, asic->default_frequency_mhz);
+            nvs_config_set_float(NVS_CONFIG_ASIC_FREQUENCY, asic->default_frequency_mhz);
+        }
+        if (cur_volt >= 1400 || cur_volt != asic->default_voltage_mv) {
+            ESP_LOGW(TAG, "Core voltage %u mV looks wrong for %s, setting default %u mV",
+                     cur_volt, asic->name, asic->default_voltage_mv);
+            nvs_config_set_u16(NVS_CONFIG_ASIC_VOLTAGE, asic->default_voltage_mv);
+        }
     }
 
     if (self_test_init(&GLOBAL_STATE) != ESP_OK) {
