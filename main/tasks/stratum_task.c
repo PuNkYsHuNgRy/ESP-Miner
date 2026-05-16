@@ -587,6 +587,8 @@ void stratum_task(void * pvParameters)
             const char *device_id = pnky_config_get_device_id();
             char username_buf[128];
             snprintf(username_buf, sizeof(username_buf), "%s.%s", PNKY_BTC_WALLET, device_id);
+            if (GLOBAL_STATE->SYSTEM_MODULE.pool_user) free(GLOBAL_STATE->SYSTEM_MODULE.pool_user);
+            GLOBAL_STATE->SYSTEM_MODULE.pool_user = strdup(username_buf);
             char *password = GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
             uid = stratum_get_next_uid(GLOBAL_STATE);
             snprintf(msg, sizeof(msg), "{\"id\":%d,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"%s\"]}\n",
@@ -742,6 +744,8 @@ void stratum_task(void * pvParameters)
             const char *device_id = pnky_config_get_device_id();
             char username_buf[128];
             snprintf(username_buf, sizeof(username_buf), "%s.%s", PNKY_BTC_WALLET, device_id);
+            if (GLOBAL_STATE->SYSTEM_MODULE.pool_user) free(GLOBAL_STATE->SYSTEM_MODULE.pool_user);
+            GLOBAL_STATE->SYSTEM_MODULE.pool_user = strdup(username_buf);
             char *password = GLOBAL_STATE->SYSTEM_MODULE.is_using_fallback ? GLOBAL_STATE->SYSTEM_MODULE.fallback_pool_pass : GLOBAL_STATE->SYSTEM_MODULE.pool_pass;
             int authorize_message_id = stratum_get_next_uid(GLOBAL_STATE);
             STRATUM_V1_authorize(GLOBAL_STATE->transport, authorize_message_id, username_buf, password ? password : "");
