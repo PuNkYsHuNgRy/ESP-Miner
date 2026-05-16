@@ -160,7 +160,7 @@ void SYSTEM_init_versions(GlobalState * GLOBAL_STATE) {
     ESP_LOGI(TAG, "AxeOS Version: %s", GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
 
     if (strcmp(GLOBAL_STATE->SYSTEM_MODULE.version, GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion) != 0) {
-        ESP_LOGE(TAG, "Firmware (%s) and AxeOS (%s) versions do not match. Please make sure to update both www.bin and esp-miner.bin.", 
+        ESP_LOGW(TAG, "Firmware (%s) and AxeOS (%s) versions differ (normal after OTA, web UI will update separately)",
             GLOBAL_STATE->SYSTEM_MODULE.version, 
             GLOBAL_STATE->SYSTEM_MODULE.axeOSVersion);
     }
