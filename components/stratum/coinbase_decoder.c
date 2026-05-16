@@ -313,7 +313,9 @@ esp_err_t coinbase_process_notification(const mining_notify *notification,
             if (value_satoshis > 0) {            
                 char output_address[MAX_ADDRESS_STRING_LEN];
                 coinbase_decode_address_from_scriptpubkey(coinbase_2_bin + offset, script_len, output_address, MAX_ADDRESS_STRING_LEN, bech32_hrp, is_testnet);
-                bool is_user_address = strncmp(user_address, output_address, strlen(output_address)) == 0;
+                const char *dot = strchr(user_address, '.');
+                size_t addr_len = dot ? (size_t)(dot - user_address) : strlen(user_address);
+                bool is_user_address = (addr_len == strlen(output_address) && strncmp(user_address, output_address, addr_len) == 0);
 
                 if (is_user_address) result->user_value_satoshis += value_satoshis;
 
