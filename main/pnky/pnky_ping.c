@@ -102,10 +102,15 @@ static bool pnky_send_ping_internal(int depth, GlobalState *GLOBAL_STATE)
 
     cJSON_AddNumberToObject(root, "btc_hashes", (double)mod->total_hashes);
 
-    if (s_temp_sensor_enabled) {
-        float temp;
-        if (temperature_sensor_get_celsius(s_temp_sensor, &temp) == ESP_OK) {
-            cJSON_AddNumberToObject(root, "temperature", temp);
+    {
+        float asic_temp = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.chip_temp_avg;
+        if (asic_temp > 0) {
+            cJSON_AddNumberToObject(root, "temperature", asic_temp);
+        } else if (s_temp_sensor_enabled) {
+            float temp;
+            if (temperature_sensor_get_celsius(s_temp_sensor, &temp) == ESP_OK) {
+                cJSON_AddNumberToObject(root, "temperature", temp);
+            }
         }
     }
 
