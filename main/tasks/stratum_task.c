@@ -481,6 +481,7 @@ void stratum_task(void * pvParameters)
     }
 
     ESP_LOGI(TAG, "Opening connection to pool: %s:%d", stratum_url, port);
+    static int restart_counter = 0;
     while (1) {
         if (!GLOBAL_STATE->ASIC_initalized) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -547,9 +548,17 @@ void stratum_task(void * pvParameters)
             if (!ws) {
                 ESP_LOGE(TAG, "WS connect failed to %s:%d", stratum_url, port);
                 retry_attempts++;
+                // Restart if persistently failing (e.g. TLS heap fragmentation)
                 vTaskDelay(5000 / portTICK_PERIOD_MS);
+                restart_counter++;
+                if (restart_counter >= 12) {
+                    ESP_LOGE(TAG, "Too many consecutive connection failures, restarting...");
+                    vTaskDelay(2000 / portTICK_PERIOD_MS);
+                    esp_restart();
+                }
                 continue;
             }
+            restart_counter = 0;
 
             GLOBAL_STATE->ws_ctx = ws;
             GLOBAL_STATE->transport = NULL;
