@@ -81,7 +81,7 @@ typedef struct {
 static const uint16_t BM1397_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 500, 525, 550, 575, 600, 0};
 static const uint16_t BM1366_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 500, 525, 550, 575,      0};
 static const uint16_t BM1368_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 485, 490, 500, 525, 550, 575, 0};
-static const uint16_t BM1370_FREQUENCY_OPTIONS[]   = {400, 490, 525, 550, 600, 625,                     0};
+static const uint16_t BM1370_FREQUENCY_OPTIONS[]   = {400, 425, 450, 475, 490, 500, 525, 550, 575, 600, 625, 650, 700, 750, 800, 850, 900, 0};
 static const uint16_t BM1370_FRQUENCY_XP_OPTIONS[] = {350, 375, 380, 400, 410,                        0};
 
 static const uint16_t BM1397_VOLTAGE_OPTIONS[] = {1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500, 0};
